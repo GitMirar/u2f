@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>U2F Demo</title>
+    <script src="js/u2f-api-1.1.js" type="application/javascript"></script>
+    <script type="application/javascript">
+
+        function FetchErrorHandler(err) {
+            console.log('Fetch Error :-S', err);
+        }
+
+        function DoRegistration() {
+            fetch("./api/register/begin")
+            .then(
+                function (response) {
+                    if (response.status !== 200) {
+                        console.log(response);
+                        return;
+                    }
+                    response.json().then(
+                        function (registrationData) {
+                            challenge = registrationData.challenge;
+                            console.log("registration challenge" + challenge);
+                            u2f.register(registrationData.appId,
+                                [registrationData],
+                                [],
+                                function(data) {
+                                    if(data.errorCode) {
+                                        document.getElementById("result").innerText = "U2F failed with error: " + data.errorCode;
+                                        return;
+                                    }
+
+                                    fetch("./api/register/complete", {
+                                        method: "POST",
+                                        headers: {
+                                            "Content-Type": "application/json",
+                                        },
+                                        body: JSON.stringify(data),
+                                    }).then(function () {
+                                            alert("key registered");
+                                        }
+                                    ).catch(
+                                        FetchErrorHandler
+                                    );
+                                });
+                        }
+                    );
+                }
+            )
+            .catch(
+                FetchErrorHandler
+            );
+        }
+
+        function DoSignRequest() {
+            var credentials = {
+                user: "testuser",
+                password: "password",
+            }
+
+            fetch("./api/authenticate/begin", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(credentials),
+            }).then(
+                function (response) {
+                    response.json().then(
+                        function (SignRequestData) {
+                            u2f.sign(SignRequestData.appId,
+                                SignRequestData.challenge,
+                                [SignRequestData],
+                                function (signResponseData) {
+                                    if(signResponseData.errorCode) {
+                                        return;
+                                    }
+                                    fetch("./api/authenticate/complete", {
+                                        method: "POST",
+                                        headers: {
+                                            "Content-Type": "application/json",
+                                        },
+                                        body: JSON.stringify(signResponseData),
+                                    }).then(
+                                        function (authResponseData) {
+                                            console.log(authResponseData)
+                                            alert("auth complete");
+                                        }
+                                    ).catch(
+                                        FetchErrorHandler
+                                    );
+                                }
+                            )
+                        }
+                    );
+                }
+            ).catch(
+                FetchErrorHandler
+            );
+        }
+    </script>
+</head>
+<body>
+    <h1>U2F Demo</h1>
+    <p>
+        Demo page for U2F stuff.
+    </p>
+    <form>
+        <button type="button" onclick="DoRegistration()">Register</button>
+        <button type="button" onclick="DoSignRequest()">Sign</button>
+    </form>
+</body>
+</html>
