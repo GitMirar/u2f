@@ -76,7 +76,28 @@ func NewU2FApi(server *HTTPServer,
 	return a
 }
 
+func (a *Api) gc() {
+	/*
+		Garbage collect timeouted state.
+	*/
+	a.authStateLock.Lock()
+	for k, v := range a.authState {
+		if time.Now().After(v.T.Add(ApiTimeout)) {
+			delete(a.authState, k)
+		}
+	}
+	a.authStateLock.Unlock()
+	a.registrationStateLock.Lock()
+	for k, v := range a.registrationState {
+		if time.Now().After(v.Add(ApiTimeout)) {
+			delete(a.registrationState, k)
+		}
+	}
+	a.registrationStateLock.Unlock()
+}
+
 func (a *Api) RegisterBegin(writer http.ResponseWriter, _ *http.Request) {
+	a.gc()
 	a.registrationStateLock.Lock()
 	defer a.registrationStateLock.Unlock()
 	userId, err := uuid.NewRandom()
@@ -100,6 +121,7 @@ func (a *Api) RegisterBegin(writer http.ResponseWriter, _ *http.Request) {
 }
 
 func (a *Api) RegisterComplete(writer http.ResponseWriter, request *http.Request) {
+	a.gc()
 	requestData, _ := ioutil.ReadAll(request.Body)
 	r, err := ParseRegistrationResponse(requestData)
 	if err != nil {
@@ -177,6 +199,7 @@ func (a *Api) RegisterComplete(writer http.ResponseWriter, request *http.Request
 }
 
 func (a *Api) AuthenticateBegin(writer http.ResponseWriter, request *http.Request) {
+	a.gc()
 	a.authStateLock.Lock()
 	defer a.authStateLock.Unlock()
 	requestData, err := ioutil.ReadAll(request.Body)
@@ -246,6 +269,7 @@ func (a *Api) AuthenticateBegin(writer http.ResponseWriter, request *http.Reques
 }
 
 func (a *Api) AuthenticateComplete(writer http.ResponseWriter, request *http.Request) {
+	a.gc()
 	a.authStateLock.Lock()
 	defer a.authStateLock.Unlock()
 	requestData, _ := ioutil.ReadAll(request.Body)
