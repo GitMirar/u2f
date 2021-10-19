@@ -1,4 +1,4 @@
 .idea
 *.pem
 *.crt
-u2f-demo-server
+/u2f-demo-server
