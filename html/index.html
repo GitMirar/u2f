@@ -11,7 +11,7 @@
         }
 
         function DoRegistration() {
-            fetch("./api/register/begin")
+            fetch("./auth/register/begin")
             .then(
                 function (response) {
                     if (response.status !== 200) {
@@ -31,7 +31,7 @@
                                         return;
                                     }
 
-                                    fetch("./api/register/complete", {
+                                    fetch("./auth/register/complete", {
                                         method: "POST",
                                         headers: {
                                             "Content-Type": "application/json",
@@ -59,7 +59,7 @@
                 password: "password",
             }
 
-            fetch("./api/authenticate/begin", {
+            fetch("./auth/authenticate/begin", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -76,7 +76,7 @@
                                     if(signResponseData.errorCode) {
                                         return;
                                     }
-                                    fetch("./api/authenticate/complete", {
+                                    fetch("./auth/authenticate/complete", {
                                         method: "POST",
                                         headers: {
                                             "Content-Type": "application/json",
@@ -85,7 +85,11 @@
                                     }).then(
                                         function (authResponseData) {
                                             console.log(authResponseData)
-                                            alert("auth complete");
+                                            if (authResponseData.status === 200) {
+                                                alert("auth complete");
+                                            } else {
+                                                alert("auth failed");
+                                            }
                                         }
                                     ).catch(
                                         FetchErrorHandler

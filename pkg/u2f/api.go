@@ -22,34 +22,61 @@ import (
 type Api struct {
 	appId                 string
 	db                    AccountDatabase
-	userDb                UserDatabase
 	registrationState     map[uuid.UUID]time.Time
 	registrationStateLock sync.RWMutex
-	secureCookie          *securecookie.SecureCookie
+	authState             map[string]struct {
+		T         time.Time
+		Challenge []byte
+	}
+	authStateLock          sync.RWMutex
+	secureCookie           *securecookie.SecureCookie
+	authCallback           AuthenticationCallback
+	exposeRegisterEndpoint bool
 }
 
 const (
-	U2fVersion      = "U2F_V2"
-	RegisterTimeout = 30 * time.Second
-	U2fTokenId      = "SFID"
+	U2fVersion = "U2F_V2"
+	ApiTimeout = 30 * time.Second
+	U2fTokenId = "U2FTID"
 )
 
-func NewU2FApi(server *HTTPServer, db AccountDatabase, appId string, hashKey [32]byte, blockKey [32]byte) (a *Api) {
+const (
+	U2F_STATUS_SUCCESS = 0
+	U2F_STATUS_ERROR   = 1
+	U2F_STATUS_FAILURE = 2
+)
+
+func NewU2FApi(server *HTTPServer,
+	db AccountDatabase,
+	appId string,
+	hashKey [32]byte,
+	blockKey [32]byte,
+	exposeRegisterEndpoint bool,
+	authCallback AuthenticationCallback) (a *Api) {
 	a = &Api{
 		db:                    db,
 		appId:                 appId,
 		registrationState:     map[uuid.UUID]time.Time{},
 		registrationStateLock: sync.RWMutex{},
-		secureCookie:          securecookie.New(hashKey[:], blockKey[:]),
+		authState: map[string]struct {
+			T         time.Time
+			Challenge []byte
+		}{},
+		authStateLock:          sync.RWMutex{},
+		secureCookie:           securecookie.New(hashKey[:], blockKey[:]),
+		authCallback:           authCallback,
+		exposeRegisterEndpoint: exposeRegisterEndpoint,
 	}
-	server.HandleFunc("/api/register/begin", a.RegisterBegin)
-	server.HandleFunc("/api/register/complete", a.RegisterComplete)
-	server.HandleFunc("/api/authenticate/begin", a.AuthenticateBegin)
-	server.HandleFunc("/api/authenticate/complete", a.AuthenticateComplete)
+	if a.exposeRegisterEndpoint {
+		server.HandleFunc("/auth/register/begin", a.RegisterBegin)
+		server.HandleFunc("/auth/register/complete", a.RegisterComplete)
+	}
+	server.HandleFunc("/auth/authenticate/begin", a.AuthenticateBegin)
+	server.HandleFunc("/auth/authenticate/complete", a.AuthenticateComplete)
 	return a
 }
 
-func (a *Api) RegisterBegin(writer http.ResponseWriter, request *http.Request) {
+func (a *Api) RegisterBegin(writer http.ResponseWriter, _ *http.Request) {
 	a.registrationStateLock.Lock()
 	defer a.registrationStateLock.Unlock()
 	userId, err := uuid.NewRandom()
@@ -93,7 +120,7 @@ func (a *Api) RegisterComplete(writer http.ResponseWriter, request *http.Request
 	}
 
 	if t, ok := a.registrationState[userId]; ok {
-		if time.Now().After(t.Add(RegisterTimeout)) {
+		if time.Now().After(t.Add(ApiTimeout)) {
 			http.Error(writer, http.StatusText(http.StatusRequestTimeout), http.StatusRequestTimeout)
 			return
 		}
@@ -122,7 +149,7 @@ func (a *Api) RegisterComplete(writer http.ResponseWriter, request *http.Request
 			return
 		}
 
-		if err := a.db.Register(userId.String(), r); err != nil {
+		if err := a.db.Register(userId.String(), r.KeyHandle, r.PubKey); err != nil {
 			http.Error(writer, http.StatusText(http.StatusConflict), http.StatusConflict)
 			return
 		}
@@ -150,6 +177,8 @@ func (a *Api) RegisterComplete(writer http.ResponseWriter, request *http.Request
 }
 
 func (a *Api) AuthenticateBegin(writer http.ResponseWriter, request *http.Request) {
+	a.authStateLock.Lock()
+	defer a.authStateLock.Unlock()
 	requestData, err := ioutil.ReadAll(request.Body)
 	if err != nil {
 		http.Error(writer, http.StatusText(http.StatusNotFound), http.StatusNotFound)
@@ -163,9 +192,9 @@ func (a *Api) AuthenticateBegin(writer http.ResponseWriter, request *http.Reques
 		return
 	}
 
-	var value string
+	var userIdentifier string
 	if cookie, err := request.Cookie(U2fTokenId); err == nil {
-		if err = a.secureCookie.Decode(U2fTokenId, cookie.Value, &value); err != nil {
+		if err = a.secureCookie.Decode(U2fTokenId, cookie.Value, &userIdentifier); err != nil {
 			http.Error(writer, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
@@ -174,20 +203,35 @@ func (a *Api) AuthenticateBegin(writer http.ResponseWriter, request *http.Reques
 		return
 	}
 
-	keyIdentifier, err := a.db.GetKeyHandle(value)
+	keyIdentifier, err := a.db.GetKeyHandle(userIdentifier)
 	if err != nil {
+		a.authCallback(U2F_STATUS_ERROR, writer, request, userIdentifier)
 		http.Error(writer, http.StatusText(http.StatusNotFound), http.StatusNotFound)
 		return
 	}
 
 	challenge, err := uuid.NewRandom()
 	if err != nil {
+		a.authCallback(U2F_STATUS_ERROR, writer, request, userIdentifier)
 		http.Error(writer, http.StatusText(http.StatusNotFound), http.StatusNotFound)
 		return
 	}
+
 	bChallenger, err := challenge.MarshalBinary()
 	if err != nil {
+		a.authCallback(U2F_STATUS_ERROR, writer, request, userIdentifier)
 		http.Error(writer, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+		return
+	}
+
+	if _, ok := a.authState[userIdentifier]; !ok {
+		a.authState[userIdentifier] = struct {
+			T         time.Time
+			Challenge []byte
+		}{T: time.Now(), Challenge: bChallenger}
+	} else {
+		a.authCallback(U2F_STATUS_ERROR, writer, request, userIdentifier)
+		http.Error(writer, http.StatusText(http.StatusConflict), http.StatusConflict)
 		return
 	}
 
@@ -202,14 +246,16 @@ func (a *Api) AuthenticateBegin(writer http.ResponseWriter, request *http.Reques
 }
 
 func (a *Api) AuthenticateComplete(writer http.ResponseWriter, request *http.Request) {
+	a.authStateLock.Lock()
+	defer a.authStateLock.Unlock()
 	requestData, _ := ioutil.ReadAll(request.Body)
 	if r, err := ParseSignatureResponse(requestData); err != nil {
 		http.Error(writer, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	} else {
-		var value string
+		var userIdentifier string
 		if cookie, err := request.Cookie(U2fTokenId); err == nil {
-			if err = a.secureCookie.Decode(U2fTokenId, cookie.Value, &value); err != nil {
+			if err = a.secureCookie.Decode(U2fTokenId, cookie.Value, &userIdentifier); err != nil {
 				http.Error(writer, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 				return
 			}
@@ -218,15 +264,42 @@ func (a *Api) AuthenticateComplete(writer http.ResponseWriter, request *http.Req
 			return
 		}
 
-		pubKey, err := a.db.GetPublicKey(value)
+		var bIssuedChallenge []byte
+		if s, ok := a.authState[userIdentifier]; ok {
+			if time.Now().After(s.T.Add(ApiTimeout)) {
+				a.authCallback(U2F_STATUS_ERROR, writer, request, userIdentifier)
+				delete(a.authState, userIdentifier)
+				return
+			}
+			bIssuedChallenge = s.Challenge
+			delete(a.authState, userIdentifier)
+		} else {
+			// we didn't see a call to /auth/authenticate/begin for this user id
+			a.authCallback(U2F_STATUS_ERROR, writer, request, userIdentifier)
+			return
+		}
+
+		bChallenge, err := WebSafeB64Decode(r.ClientData.Challenge)
 		if err != nil {
-			http.Error(writer, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+			a.authCallback(U2F_STATUS_ERROR, writer, request, userIdentifier)
+			return
+		}
+		if string(bChallenge) != string(bIssuedChallenge) {
+			// The signed challenge does not match the challenge on record for this authentication.
+			// Possibly this is a replay attack.
+			a.authCallback(U2F_STATUS_ERROR, writer, request, userIdentifier)
+			return
+		}
+
+		pubKey, err := a.db.GetPublicKey(userIdentifier)
+		if err != nil {
+			a.authCallback(U2F_STATUS_ERROR, writer, request, userIdentifier)
 			return
 		}
 
 		AppIdIdna, err := idna.ToASCII(r.ClientData.Origin)
 		if err != nil {
-			http.Error(writer, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			a.authCallback(U2F_STATUS_ERROR, writer, request, userIdentifier)
 			return
 		}
 		AppParam := sha256.Sum256([]byte(AppIdIdna))
@@ -246,15 +319,15 @@ func (a *Api) AuthenticateComplete(writer http.ResponseWriter, request *http.Req
 			R, S *big.Int
 		}
 		if _, err := asn1.Unmarshal(r.SignatureData.Signature, &esig); err != nil {
-			http.Error(writer, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			a.authCallback(U2F_STATUS_ERROR, writer, request, userIdentifier)
 			return
 		}
 		hashBuf := sha256.Sum256(signBuffer)
 		if ecdsa.Verify(pubKey, hashBuf[:], esig.R, esig.S) {
-			http.Error(writer, http.StatusText(http.StatusOK), http.StatusOK)
+			a.authCallback(U2F_STATUS_SUCCESS, writer, request, userIdentifier)
 			return
 		} else {
-			http.Error(writer, http.StatusText(http.StatusNotAcceptable), http.StatusNotAcceptable)
+			a.authCallback(U2F_STATUS_FAILURE, writer, request, userIdentifier)
 			return
 		}
 	}

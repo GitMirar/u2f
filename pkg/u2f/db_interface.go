@@ -5,7 +5,7 @@ import (
 )
 
 type AccountDatabase interface {
-	Register(identifier string, data *RegistrationResponse) (err error)
+	Register(identifier string, keyHandle []byte, pubKey []byte) (err error)
 	GetPublicKey(identifier string) (pubKey *ecdsa.PublicKey, err error)
 	GetKeyHandle(identifier string) (keyHandle []byte, err error)
 }

@@ -1,5 +1,7 @@
 package u2f
 
+import "net/http"
+
 type RegistrationData struct {
 	Challenge string `json:"challenge"`
 	AppId     string `json:"appId"`
@@ -61,3 +63,10 @@ type SignResponse struct {
 	ClientData    *SignResponseClientData
 	SignatureData *SignResponseSignatureData
 }
+
+type AuthenticationRequest struct {
+	UserId               string `json:"user_id"`
+	AuthenticationSecret string `json:"authentication_secret"`
+}
+
+type AuthenticationCallback func(authStatus int, writer http.ResponseWriter, request *http.Request, userIdentifier string)
