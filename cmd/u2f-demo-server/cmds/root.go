@@ -29,7 +29,7 @@ func AuthCompletedCallback(authStatus int, writer http.ResponseWriter, _ *http.R
 		name := "SID"
 		cookie := &http.Cookie{
 			Name:     name,
-			Value:    "some data authentication a user session",
+			Value:    "some data authenticating a user session",
 			Path:     "/",
 			HttpOnly: true,
 			Secure:   true,

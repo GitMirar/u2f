@@ -255,10 +255,10 @@ func (a *Api) AuthenticateBegin(writer http.ResponseWriter, request *http.Reques
 	cookie := &http.Cookie{
 		Name:     U2fTokenId,
 		Value:    encoded,
-		Path:     "/",
+		Path:     "/auth/",
 		HttpOnly: true,
 		Secure:   true,
-		Expires:  time.Now().Add(10 * time.Hour * 24 * 365 * 10),
+		Expires:  time.Now().Add(ApiTimeout),
 	}
 	http.SetCookie(writer, cookie)
 
