@@ -148,7 +148,7 @@ func init() {
 	log.SetOutput(os.Stdout)
 	rootCmd.Flags().StringP("domain", "d", "localhost", "The domain where the server is hosted")
 	rootCmd.Flags().StringP("bind-address", "i", "0.0.0.0", "Bind address of the server")
-	rootCmd.Flags().Uint16P("port", "p", 8443, "Port port where the server is hosted")
+	rootCmd.Flags().Uint16P("port", "p", 8443, "HTTP server port")
 
 	var hashKey, blockKey [32]byte
 	if _, err := rand.Read(hashKey[:]); err != nil {

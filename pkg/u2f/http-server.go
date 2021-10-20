@@ -12,6 +12,10 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+/*
+HTTPServer is only part of this package for use in the U2F demo server.
+Don't use this code directly for anything important.
+*/
 type HTTPServer struct {
 	htmlDir      string
 	port         uint16
