@@ -20,7 +20,7 @@ The following API endpoints are implemented:
 
 * `/auth/register/begin` Initiate registration of a new U2F key, retrieve requested key handle from server.
 * `/auth/register/complete` Complete the registration of a new U2F key by providing the backend with an ecdsa key that
-  is signed with the device certificate (ed25519) for the requested key handle.
+  is signed with the device certificate (ecdsa) for the requested key handle.
 * `/auth/authenticate/begin` Initiate user authentication via U2F, provide user credentials, retrieve challenge from
   server.
 * `/auth/authenticate/complete` Complete the authentication by submitting the ecdsa signed challenge back to the server.
