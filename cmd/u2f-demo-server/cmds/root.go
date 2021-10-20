@@ -3,6 +3,7 @@ package cmds
 import (
 	"crypto/rand"
 	"fmt"
+	"github.com/gorilla/securecookie"
 	"net/http"
 	"os"
 	"time"
@@ -14,11 +15,14 @@ import (
 )
 
 const (
-	KeyFile  = "u2f-server-key.pem"
-	CertFile = "u2f-server.crt"
+	KeyFile      = "u2f-server-key.pem"
+	CertFile     = "u2f-server.crt"
+	MyU2fTokenId = "MyUID"
 )
 
-func AuthCallback(authStatus int, writer http.ResponseWriter, _ *http.Request, userIdentifier string) {
+var secureCookie *securecookie.SecureCookie
+
+func AuthCompletedCallback(authStatus int, writer http.ResponseWriter, _ *http.Request, userIdentifier string) {
 	switch authStatus {
 	case u2f.U2F_STATUS_SUCCESS:
 		log.Infof("Authentication successful for id %v", userIdentifier)
@@ -43,6 +47,34 @@ func AuthCallback(authStatus int, writer http.ResponseWriter, _ *http.Request, u
 		http.Error(writer, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 		break
 	}
+}
+
+func AuthCallback(_ []byte, request *http.Request) (authSuccessful bool, userIdentifier string) {
+	if cookie, err := request.Cookie(MyU2fTokenId); err == nil {
+		if err = secureCookie.Decode(MyU2fTokenId, cookie.Value, &userIdentifier); err == nil {
+			return true, userIdentifier
+		} else {
+			return false, ""
+		}
+	}
+	return false, ""
+}
+
+func RegistrationCompletedCallback(writer http.ResponseWriter, _ *http.Request, userIdentifier string) (ok bool) {
+	encoded, err := secureCookie.Encode(MyU2fTokenId, userIdentifier)
+	if err != nil {
+		return false
+	}
+	cookie := &http.Cookie{
+		Name:     MyU2fTokenId,
+		Value:    encoded,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   true,
+		Expires:  time.Now().Add(10 * time.Hour * 24 * 365 * 10),
+	}
+	http.SetCookie(writer, cookie)
+	return true
 }
 
 var rootCmd = &cobra.Command{
@@ -77,19 +109,21 @@ var rootCmd = &cobra.Command{
 		}
 
 		var hashKey, blockKey [32]byte
-		if _, err = rand.Read(hashKey[:]); err != nil {
+		if _, err := rand.Read(hashKey[:]); err != nil {
 			log.Fatalf("error %v", err)
 		}
-		if _, err = rand.Read(blockKey[:]); err != nil {
+		if _, err := rand.Read(blockKey[:]); err != nil {
 			log.Fatalf("error %v", err)
 		}
 		u2f.NewU2FApi(server,
 			u2f.NewMemDB(),
 			fmt.Sprintf("https://%s:%d", domain, port),
+			true,
 			hashKey,
 			blockKey,
-			true,
-			AuthCallback)
+			AuthCallback,
+			AuthCompletedCallback,
+			RegistrationCompletedCallback)
 
 		if err := server.Start(); err != nil {
 			log.Errorf("could not start the server due to %v", err)
@@ -110,4 +144,13 @@ func init() {
 	rootCmd.Flags().StringP("domain", "d", "localhost", "The domain where the server is hosted")
 	rootCmd.Flags().StringP("bind-address", "i", "0.0.0.0", "Bind address of the server")
 	rootCmd.Flags().Uint16P("port", "p", 8443, "Port port where the server is hosted")
+
+	var hashKey, blockKey [32]byte
+	if _, err := rand.Read(hashKey[:]); err != nil {
+		log.Fatalf("error %v", err)
+	}
+	if _, err := rand.Read(blockKey[:]); err != nil {
+		log.Fatalf("error %v", err)
+	}
+	secureCookie = securecookie.New(hashKey[:], blockKey[:])
 }

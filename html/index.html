@@ -54,10 +54,16 @@
         }
 
         function DoSignRequest() {
-            var credentials = {
-                user: "testuser",
-                password: "password",
+            let user = document.getElementById("user").value;
+            let pass = document.getElementById("pass").value;
+            if (user.length === 0 || pass.length === 0) {
+                alert("Please enter the username and password first!");
+                return;
             }
+            let credentials = {
+                user: user,
+                password: pass,
+            };
 
             fetch("./auth/authenticate/begin", {
                 method: "POST",
@@ -111,6 +117,10 @@
         Demo page for U2F stuff.
     </p>
     <form>
+        <label for="user" style="margin-right: 10px; font-family: monospace;">Username: </label>
+        <input id="user" type="text"><br>
+        <label for="pass" style="margin-right: 10px; font-family: monospace;">Password: </label>
+        <input id="pass" type="password"><br><br>
         <button type="button" onclick="DoRegistration()">Register</button>
         <button type="button" onclick="DoSignRequest()">Sign</button>
     </form>
