@@ -49,7 +49,10 @@ func AuthCompletedCallback(authStatus int, writer http.ResponseWriter, _ *http.R
 	}
 }
 
-func AuthCallback(_ []byte, request *http.Request) (authSuccessful bool, userIdentifier string) {
+func AuthCallback(authData []byte, request *http.Request) (authSuccessful bool, userIdentifier string) {
+
+	log.Infof("authentication data %v", string(authData))
+
 	if cookie, err := request.Cookie(MyU2fTokenId); err == nil {
 		if err = secureCookie.Decode(MyU2fTokenId, cookie.Value, &userIdentifier); err == nil {
 			return true, userIdentifier

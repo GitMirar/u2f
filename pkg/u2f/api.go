@@ -14,8 +14,6 @@ import (
 	"sync"
 	"time"
 
-	log "github.com/sirupsen/logrus"
-
 	"github.com/google/uuid"
 	"golang.org/x/net/idna"
 )
@@ -206,8 +204,6 @@ func (a *Api) AuthenticateBegin(writer http.ResponseWriter, request *http.Reques
 		http.Error(writer, http.StatusText(http.StatusNotFound), http.StatusNotFound)
 		return
 	}
-
-	log.Infof("auth secret %v", string(requestData))
 
 	authSuccessful, userIdentifier := a.authCallback(requestData, request)
 	if !authSuccessful {
