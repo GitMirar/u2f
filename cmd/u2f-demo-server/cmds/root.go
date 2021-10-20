@@ -22,10 +22,10 @@ const (
 
 var secureCookie *securecookie.SecureCookie
 
-func AuthCompletedCallback(authStatus int, writer http.ResponseWriter, _ *http.Request, userIdentifier string) {
+func AuthCompletedCallback(authStatus int, writer http.ResponseWriter, _ *http.Request, keyIdentifier string) {
 	switch authStatus {
 	case u2f.U2F_STATUS_SUCCESS:
-		log.Infof("Authentication successful for id %v", userIdentifier)
+		log.Infof("Authentication successful for id %v", keyIdentifier)
 		name := "SID"
 		cookie := &http.Cookie{
 			Name:     name,
@@ -39,23 +39,25 @@ func AuthCompletedCallback(authStatus int, writer http.ResponseWriter, _ *http.R
 		http.Error(writer, http.StatusText(http.StatusOK), http.StatusOK)
 		break
 	case u2f.U2F_STATUS_ERROR:
-		log.Infof("Authentication error for id %v", userIdentifier)
+		log.Infof("Authentication error for id %v", keyIdentifier)
 		http.Error(writer, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		break
 	case u2f.U2F_STATUS_FAILURE:
-		log.Infof("Authentication failed for id %v", userIdentifier)
+		log.Infof("Authentication failed for id %v", keyIdentifier)
 		http.Error(writer, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 		break
 	}
 }
 
-func AuthCallback(authData []byte, request *http.Request) (authSuccessful bool, userIdentifier string) {
-
-	log.Infof("authentication data %v", string(authData))
-
+func AuthCallback(authData []byte, request *http.Request) (authSuccessful bool, keyIdentifier string) {
+	/*
+		In a real application this callback would deal with authenticating the user and retrieving the matching keyIdentifier
+		for this user.
+	*/
+	log.Infof("Authentication data %v", string(authData))
 	if cookie, err := request.Cookie(MyU2fTokenId); err == nil {
-		if err = secureCookie.Decode(MyU2fTokenId, cookie.Value, &userIdentifier); err == nil {
-			return true, userIdentifier
+		if err = secureCookie.Decode(MyU2fTokenId, cookie.Value, &keyIdentifier); err == nil {
+			return true, keyIdentifier
 		} else {
 			return false, ""
 		}
@@ -63,8 +65,8 @@ func AuthCallback(authData []byte, request *http.Request) (authSuccessful bool, 
 	return false, ""
 }
 
-func RegistrationCompletedCallback(writer http.ResponseWriter, _ *http.Request, userIdentifier string) (ok bool) {
-	encoded, err := secureCookie.Encode(MyU2fTokenId, userIdentifier)
+func RegistrationCompletedCallback(writer http.ResponseWriter, _ *http.Request, keyIdentifier string) (ok bool) {
+	encoded, err := secureCookie.Encode(MyU2fTokenId, keyIdentifier)
 	if err != nil {
 		return false
 	}

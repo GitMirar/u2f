@@ -4,7 +4,7 @@ import (
 	"crypto/ecdsa"
 )
 
-type AccountDatabase interface {
+type KeyDatabase interface {
 	Register(identifier string, keyHandle []byte, pubKey []byte) (err error)
 	GetPublicKey(identifier string) (pubKey *ecdsa.PublicKey, err error)
 	GetKeyHandle(identifier string) (keyHandle []byte, err error)

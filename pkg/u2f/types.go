@@ -66,11 +66,11 @@ type SignResponse struct {
 
 // AuthenticationCompletedCallback is called when the U2F authentication either has failed or succeeded.
 // The writer object should be used to send an appropriate response to the frontend.
-type AuthenticationCompletedCallback func(authStatus int, writer http.ResponseWriter, request *http.Request, userIdentifier string)
+type AuthenticationCompletedCallback func(authStatus int, writer http.ResponseWriter, request *http.Request, keyIdentifier string)
 
 // RegistrationCompletedCallback is called when a new key successfully enrolled.
 // In case the enrollment request should be declined return false, otherwise return true.
-type RegistrationCompletedCallback func(writer http.ResponseWriter, request *http.Request, userIdentifier string) (ok bool)
+type RegistrationCompletedCallback func(writer http.ResponseWriter, request *http.Request, keyIdentifier string) (ok bool)
 
 // UserAuthenticationCallback is called to authenticate a user in the "authenticate begin" step.
 // The function must return true for a successful authentication and the identifier that corresponds to the stored
