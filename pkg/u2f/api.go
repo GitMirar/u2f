@@ -214,21 +214,18 @@ func (a *Api) AuthenticateBegin(writer http.ResponseWriter, request *http.Reques
 	keyHandle, err := a.db.GetKeyHandle(keyIdentifier)
 	if err != nil {
 		a.authCompleteCallback(U2F_STATUS_ERROR, writer, request, keyIdentifier)
-		http.Error(writer, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
 	challenge, err := uuid.NewRandom()
 	if err != nil {
 		a.authCompleteCallback(U2F_STATUS_ERROR, writer, request, keyIdentifier)
-		http.Error(writer, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
 	bChallenger, err := challenge.MarshalBinary()
 	if err != nil {
 		a.authCompleteCallback(U2F_STATUS_ERROR, writer, request, keyIdentifier)
-		http.Error(writer, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
@@ -239,7 +236,6 @@ func (a *Api) AuthenticateBegin(writer http.ResponseWriter, request *http.Reques
 		}{T: time.Now(), Challenge: bChallenger}
 	} else {
 		a.authCompleteCallback(U2F_STATUS_ERROR, writer, request, keyIdentifier)
-		http.Error(writer, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
