@@ -39,7 +39,7 @@ type Api struct {
 
 const (
 	U2fVersion = "U2F_V2"
-	ApiTimeout = 30 * time.Second
+	ApiTimeout = 10 * time.Second
 	U2fTokenId = "U2FTID"
 )
 
