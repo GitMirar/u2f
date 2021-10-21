@@ -197,7 +197,6 @@ func (a *Api) RegisterComplete(writer http.ResponseWriter, request *http.Request
 
 		if !a.registrationCompleteCallback(writer, request, userId.String()) {
 			delete(a.registrationState, userId)
-			http.Error(writer, http.StatusText(http.StatusForbidden), http.StatusForbidden)
 			return
 		}
 
@@ -220,7 +219,6 @@ func (a *Api) AuthenticateBegin(writer http.ResponseWriter, request *http.Reques
 
 	authSuccessful, keyIdentifier := a.authCallback(requestData, request)
 	if !authSuccessful {
-		http.Error(writer, http.StatusText(http.StatusForbidden), http.StatusForbidden)
 		return
 	}
 
