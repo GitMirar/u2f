@@ -34,6 +34,7 @@ type Api struct {
 	authCompleteCallback         AuthenticationCompletedCallback
 	registrationCompleteCallback RegistrationCompletedCallback
 	authCallback                 UserAuthenticationCallback
+	registrationCallback         RegistrationCallback
 	exposeRegisterEndpoint       bool
 }
 
@@ -57,6 +58,7 @@ func NewU2FApi(server *mux.Router,
 	cookieBlockKey [32]byte,
 	authCallback UserAuthenticationCallback,
 	authCompletedCallback AuthenticationCompletedCallback,
+	registrationCallback RegistrationCallback,
 	registrationCompletedCallback RegistrationCompletedCallback) (a *Api) {
 	a = &Api{
 		db:                    db,
@@ -70,6 +72,7 @@ func NewU2FApi(server *mux.Router,
 		authStateLock:                sync.RWMutex{},
 		authCompleteCallback:         authCompletedCallback,
 		registrationCompleteCallback: registrationCompletedCallback,
+		registrationCallback:         registrationCallback,
 		authCallback:                 authCallback,
 		exposeRegisterEndpoint:       exposeRegisterEndpoint,
 		secureCookie:                 securecookie.New(cookieHashKey[:], cookieBlockKey[:]),
@@ -103,10 +106,18 @@ func (a *Api) gc() {
 	a.registrationStateLock.Unlock()
 }
 
-func (a *Api) RegisterBegin(writer http.ResponseWriter, _ *http.Request) {
+func (a *Api) RegisterBegin(writer http.ResponseWriter, request *http.Request) {
 	a.gc()
 	a.registrationStateLock.Lock()
 	defer a.registrationStateLock.Unlock()
+	requestData, err := ioutil.ReadAll(request.Body)
+	if err != nil {
+		requestData = nil
+	}
+	if !a.registrationCallback(requestData, request) {
+		http.Error(writer, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		return
+	}
 	userId, err := uuid.NewRandom()
 	if err != nil {
 		http.Error(writer, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)

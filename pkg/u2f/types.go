@@ -78,3 +78,7 @@ type RegistrationCompletedCallback func(writer http.ResponseWriter, request *htt
 // A typical scenario would be a lookup in a user database that contains
 // UNIQUE(userId == keyslotId), UNIQUE(username), password
 type UserAuthenticationCallback func(authData []byte, request *http.Request) (authenticationSuccess bool, identifier string)
+
+// RegistrationCallback is called on the initial call to the registration endpoint.
+// Must return true for the enrollment to proceed.
+type RegistrationCallback func(authData []byte, request *http.Request) (authenticationSuccess bool)

@@ -65,6 +65,10 @@ func AuthCallback(authData []byte, request *http.Request) (authSuccessful bool, 
 	return false, ""
 }
 
+func RegistrationCallback(_ []byte, _ *http.Request) (authenticationSuccess bool) {
+	return true
+}
+
 func RegistrationCompletedCallback(writer http.ResponseWriter, _ *http.Request, keyIdentifier string) (ok bool) {
 	encoded, err := secureCookie.Encode(MyU2fTokenId, keyIdentifier)
 	if err != nil {
@@ -128,6 +132,7 @@ var rootCmd = &cobra.Command{
 			blockKey,
 			AuthCallback,
 			AuthCompletedCallback,
+			RegistrationCallback,
 			RegistrationCompletedCallback)
 
 		if err := server.Start(); err != nil {
