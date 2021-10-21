@@ -120,7 +120,7 @@ var rootCmd = &cobra.Command{
 		if _, err := rand.Read(blockKey[:]); err != nil {
 			log.Fatalf("error %v", err)
 		}
-		u2f.NewU2FApi(server,
+		u2f.NewU2FApi(server.GetRouter(),
 			u2f.NewMemDB(),
 			fmt.Sprintf("https://%s:%d", domain, port),
 			true,

@@ -84,8 +84,13 @@ func (s *HTTPServer) HandleFunc(path string, f func(http.ResponseWriter, *http.R
 	return s.router.HandleFunc(path, f)
 }
 
+func (s *HTTPServer) GetRouter() (router *mux.Router) {
+	return s.router
+}
+
 func NewHTTPServer(bindAddress string, port uint16, hostname string, htmlDir string, tlsCert string, tlsKey string) *HTTPServer {
 	s := &HTTPServer{
+		router:       mux.NewRouter().StrictSlash(true),
 		hostname:     hostname,
 		bindAddress:  bindAddress,
 		port:         port,

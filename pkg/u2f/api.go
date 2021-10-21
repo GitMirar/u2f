@@ -7,6 +7,7 @@ import (
 	"encoding/asn1"
 	"encoding/binary"
 	"encoding/json"
+	"github.com/gorilla/mux"
 	"github.com/gorilla/securecookie"
 	"io/ioutil"
 	"math/big"
@@ -48,7 +49,7 @@ const (
 	U2F_STATUS_FAILURE = 2
 )
 
-func NewU2FApi(server *HTTPServer,
+func NewU2FApi(server *mux.Router,
 	db KeyDatabase,
 	appId string,
 	exposeRegisterEndpoint bool,
