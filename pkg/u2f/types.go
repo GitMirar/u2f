@@ -81,4 +81,4 @@ type UserAuthenticationCallback func(authData []byte, request *http.Request) (au
 
 // RegistrationCallback is called on the initial call to the registration endpoint.
 // Must return true for the enrollment to proceed.
-type RegistrationCallback func(authData []byte, request *http.Request) (authenticationSuccess bool)
+type RegistrationCallback func(authData []byte, keyIdentifier string, request *http.Request) (authenticationSuccess bool)

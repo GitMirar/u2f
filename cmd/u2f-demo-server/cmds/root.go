@@ -65,7 +65,7 @@ func AuthCallback(authData []byte, request *http.Request) (authSuccessful bool, 
 	return false, ""
 }
 
-func RegistrationCallback(_ []byte, _ *http.Request) (authenticationSuccess bool) {
+func RegistrationCallback(_ []byte, _ string, _ *http.Request) (authenticationSuccess bool) {
 	return true
 }
 

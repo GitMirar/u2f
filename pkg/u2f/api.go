@@ -114,13 +114,14 @@ func (a *Api) RegisterBegin(writer http.ResponseWriter, request *http.Request) {
 	if err != nil {
 		requestData = nil
 	}
-	if !a.registrationCallback(requestData, request) {
-		http.Error(writer, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
-		return
-	}
+
 	userId, err := uuid.NewRandom()
 	if err != nil {
 		http.Error(writer, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	if !a.registrationCallback(requestData, userId.String(), request) {
+		http.Error(writer, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 		return
 	}
 	userIdB, err := userId.MarshalBinary()
